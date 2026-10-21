@@ -1,0 +1,250 @@
+title_must_match:
+- project manager
+- programme manager
+- program manager
+- projektmanager
+- projektleiter
+- senior project manager
+- technical project manager
+- it project manager
+- delivery manager
+- projektleder
+- prosjektleder
+- projektipäällikkö
+- projektipaallikko
+- projectmanager
+- projectleider
+- chef de projet
+- gestionnaire de projet
+- project lead
+- program lead
+- delivery lead
+- portfolio manager
+- pmo manager
+- implementation manager
+title_must_not_match:
+- stadionbau
+- elektrotechnik
+- hochbau
+- wohnungsbau
+- museumsbau
+- tiefbau
+- rohbau
+- gebäudetechnik
+- gebaudetechnik
+- hlk
+- sanitärtechnik
+- sanitartechnik
+- bauleiter
+- bauen im bestand
+- schlüsselfertig
+- schlusselfertig
+- mieterausbau
+- dachgeschossausbau
+main_min_score: 3
+score_ceiling: 20
+scoring_keywords:
+- term: aerospace
+  weight: 5
+- term: Luft- und Raumfahrt
+  weight: 5
+- term: Luftfahrt
+  weight: 5
+- term: defence
+  weight: 5
+- term: defense
+  weight: 5
+- term: Verteidigung
+  weight: 5
+- term: Wehrtechnik
+  weight: 5
+- term: Rüstung
+  weight: 5
+- term: military
+  weight: 4
+- term: Militär
+  weight: 4
+- term: militärisch
+  weight: 4
+- term: energy
+  weight: 2
+- term: Energie
+  weight: 2
+- term: electricity market
+  weight: 3
+- term: Strommarkt
+  weight: 3
+- term: grid
+  weight: 2
+- term: Stromnetz
+  weight: 2
+- term: Übertragungsnetz
+  weight: 2
+- term: EU regulatory
+  weight: 3
+- term: regulatory compliance
+  weight: 3
+- term: regulatorische Anforderungen
+  weight: 3
+- term: Regulatorik
+  weight: 3
+- term: compliance
+  weight: 1
+- term: PMP
+  weight: 2
+- term: CAPM
+  weight: 1
+- term: PMI
+  weight: 1
+- term: risk management
+  weight: 2
+- term: Risikomanagement
+  weight: 2
+- term: risk
+  weight: 1
+- term: Risiko
+  weight: 1
+- term: stakeholder management
+  weight: 2
+- term: stakeholder
+  weight: 1
+- term: supply chain
+  weight: 2
+- term: Lieferkette
+  weight: 2
+- term: procurement
+  weight: 2
+- term: Beschaffung
+  weight: 2
+- term: Einkauf
+  weight: 2
+- term: crisis management
+  weight: 2
+- term: Krisenmanagement
+  weight: 2
+- term: agile
+  weight: 1
+- term: agil
+  weight: 1
+- term: waterfall
+  weight: 1
+- term: Wasserfallmethode
+  weight: 1
+- term: Wasserfallmodell
+  weight: 1
+- term: IT project
+  weight: 2
+- term: IT-Projekt
+  weight: 2
+- term: IT solutions
+  weight: 1
+- term: IT-Lösung
+  weight: 1
+- term: process improvement
+  weight: 1
+- term: Prozessverbesserung
+  weight: 1
+- term: Prozessoptimierung
+  weight: 1
+- term: governance
+  weight: 1
+- term: SAP
+  weight: 1
+- term: Jira
+  weight: 1
+- term: cross-functional
+  weight: 1
+- term: funktionsübergreifend
+  weight: 1
+- term: bereichsübergreifend
+  weight: 1
+- term: tender
+  weight: 1
+- term: Ausschreibung
+  weight: 1
+- term: audit
+  weight: 1
+- term: budget
+  weight: 1
+- term: leadership
+  weight: 1
+- term: Führungskompetenz
+  weight: 1
+- term: Führungserfahrung
+  weight: 1
+- term: negotiation
+  weight: 1
+- term: Verhandlung
+  weight: 1
+
+# Set enabled to false to disable the related-role trial.
+related_roles:
+  enabled: true
+  min_responsibility_groups: 2
+  required_any_group:
+  - delivery
+  - governance
+  - transformation
+  candidate_title_patterns:
+  - \bconsultants?\b
+  - \bconsulting\b
+  - \b(?:unternehmens|management|organisations|prozess)?berater(?:in)?\b
+  - \badvis(?:or|er|ory)\b
+  - \btransformation (?:lead|manager)\b
+  responsibility_groups:
+    delivery:
+    - project delivery
+    - programme delivery
+    - program delivery
+    - project planning
+    - project management
+    - project implementation
+    - project coordination
+    - projektmanagement
+    - projektplanung
+    - projektsteuerung
+    - projektdurchfuehrung
+    - projektabwicklung
+    - projektleitung
+    governance:
+    - project governance
+    - programme governance
+    - program governance
+    - project portfolio
+    - portfolio management
+    - pmo
+    - projektportfolio
+    - projektcontrolling
+    risk_budget:
+    - budget management
+    - budget responsibility
+    - budget control
+    - financial control
+    - risk management
+    - dependency management
+    - risikomanagement
+    - budgetverantwortung
+    - budgetplanung
+    - kostenkontrolle
+    - abhaengigkeitsmanagement
+    stakeholders:
+    - stakeholder management
+    - stakeholder coordination
+    - cross-functional coordination
+    - cross functional teams
+    - stakeholdermanagement
+    - bereichsuebergreifende koordination
+    - interdisziplinaere teams
+    transformation:
+    - transformation implementation
+    - transformation delivery
+    - change management
+    - organisational transformation
+    - organizational transformation
+    - process improvement
+    - process optimisation
+    - process optimization
+    - organisationsentwicklung
+    - veraenderungsmanagement
+    - prozessoptimierung
+    - transformationsprojekte
