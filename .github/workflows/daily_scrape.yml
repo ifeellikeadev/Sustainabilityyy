@@ -1,14 +1,19 @@
 name: Daily job scrape
-
 on:
   schedule:
     - cron: "0 4 * * *"
     - cron: "0 13 * * *"
   workflow_dispatch: {}
-
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'config/**'
+      - 'tests/**'
+      - 'requirements.txt'
+      - '.github/workflows/daily_scrape.yml'
 permissions:
-  contents: write
-
+  contents: read
 concurrency:
   group: tracker-writes
   cancel-in-progress: false
@@ -25,66 +30,89 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-
+          python-version: '3.12'
       - name: Install dependencies
         run: pip install -r requirements.txt
-
-      - name: Install headless browser (for JS-rendered career sites)
-        run: python -m playwright install --with-deps chromium
-
-      - name: Check source syntax and installed dependencies
+      - name: Check syntax, dependencies and regression tests
         run: |
-          python -m compileall -q src
+          python -m compileall -q src tests
           python -m pip check
-      - name: Run scraper
+          python -m unittest discover -s tests -p 'test_tracker_repair.py' -v
+      - name: Install headless browser
+        run: python -m playwright install --with-deps chromium
+      - name: Back up previous tracker and run scraper
         run: |
           set -o pipefail
           mkdir -p diagnostics
-          rm -f docs/scraper_health.json
+          if [ -f data/job_tracker.xlsx ]; then cp data/job_tracker.xlsx diagnostics/previous_job_tracker.xlsx; fi
+          export TRACKER_SOURCE_COMMIT=$(git rev-parse HEAD)
+          rm -f docs/scraper_health.json docs/run_summary.json
           python -m src.main 2>&1 | tee diagnostics/scrape.log
-      - name: Save diagnostic report even after failure
+      - name: Validate fresh output and prepare release
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, shutil
+          from pathlib import Path
+          from bs4 import BeautifulSoup
+          docs=Path('docs')
+          build=os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT']
+          summary=json.loads((docs/'run_summary.json').read_text())
+          health=json.loads((docs/'scraper_health.json').read_text())
+          assert summary['run_id']==os.environ['GITHUB_RUN_ID'], 'Stale run summary'
+          assert summary['run_attempt']==os.environ['GITHUB_RUN_ATTEMPT'], 'Stale run attempt'
+          assert health['companies'], 'No source diagnostics'
+          page=(docs/'index.html').read_text()
+          soup=BeautifulSoup(page,'html.parser')
+          assert soup.select_one('meta[name="tracker-build"]')['content']==build, 'Stale HTML'
+          assert soup.select_one('#jobs'), 'Missing job list'
+          manifest={'build_id':build,'source_commit':summary['source_commit'],
+                    'generated_at':summary['generated_at'],
+                    'index_sha256':hashlib.sha256((docs/'index.html').read_bytes()).hexdigest(),
+                    'coverage_degraded':summary['coverage_degraded']}
+          (docs/'build_manifest.json').write_text(json.dumps(manifest,indent=2))
+          target=Path('public-site')
+          if target.exists():shutil.rmtree(target)
+          target.mkdir()
+          for name in ('index.html','scraper_health.json','run_summary.json','build_manifest.json'):
+              shutil.copy2(docs/name,target/name)
+          print(json.dumps(summary,indent=2))
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+              f.write('## Tracker release '+build+'\n\n')
+              f.write('Tracked rows: '+str(summary['tracker']['total_rows'])+'\n\n')
+              f.write('Coverage degraded: '+str(summary['coverage_degraded'])+'\n\n')
+              f.write('Source status counts: `'+json.dumps(summary['counts']['source_statuses'])+'`\n')
+          PY
+      - name: Save diagnostics and backup even after failure
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scraper-diagnostics-${{ github.run_id }}
+          name: scraper-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            diagnostics/scrape.log
+            diagnostics/
             docs/scraper_health.json
+            docs/run_summary.json
+            docs/build_manifest.json
           if-no-files-found: warn
           retention-days: 14
-
-      - name: Commit updated tracker
+      - name: Commit updated tracker and page
         run: |
           git config user.name "job-scraper-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add data/job_tracker.xlsx docs/index.html
-          if [ -f docs/scraper_health.json ]; then
-            git add docs/scraper_health.json
+          git add data/job_tracker.xlsx docs/index.html docs/scraper_health.json docs/run_summary.json docs/build_manifest.json
+          if ! git diff --staged --quiet; then
+            git commit -m "Daily job scrape update"
+            git pull --rebase --autostash origin main
+            git push origin HEAD:main
           fi
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
-          git commit -m "Daily job scrape update"
-          git pull --rebase --autostash origin main
-          git push
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-      - name: Prepare public site files
-        run: |
-          mkdir -p public-site
-          cp docs/index.html public-site/index.html
-          if [ -f docs/scraper_health.json ]; then
-            cp docs/scraper_health.json public-site/scraper_health.json
-          fi
-      - name: Upload public site
+      - name: Upload validated public site
         uses: actions/upload-pages-artifact@v4
         with:
+          name: tracker-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: public-site
   deploy:
     needs: scrape
@@ -97,6 +125,35 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy tracker website
+      - name: Deploy this run's validated site
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: tracker-pages-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Verify live HTML and release manifest
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, time, urllib.request
+          from urllib.parse import urljoin
+          base=os.environ['PAGE_URL']
+          build=os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT']
+          last='No response'
+          for attempt in range(6):
+              try:
+                  def get(name):
+                      url=urljoin(base.rstrip('/')+'/',name)+'?tracker_build='+build+'&attempt='+str(attempt)
+                      request=urllib.request.Request(url,headers={'Cache-Control':'no-cache','User-Agent':'PersonalJobTracker-release-check'})
+                      with urllib.request.urlopen(request,timeout=20) as response:return response.read()
+                  manifest=json.loads(get('build_manifest.json'))
+                  page=get('index.html')
+                  assert manifest['build_id']==build, 'Live manifest is from another build'
+                  assert hashlib.sha256(page).hexdigest()==manifest['index_sha256'], 'Live HTML differs from this release'
+                  print('Verified live release '+build)
+                  break
+              except Exception as exc:
+                  last=str(exc)
+                  if attempt<5:time.sleep(10)
+          else:raise SystemExit('Deployment reported success but live freshness could not be verified: '+last)
+          PY
