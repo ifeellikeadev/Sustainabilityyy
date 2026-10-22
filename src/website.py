@@ -8,6 +8,7 @@ from __future__ import annotations
 
 
 import datetime as dt
+import os, json
 from pathlib import Path
 
 import yaml
@@ -53,6 +54,8 @@ def _render_table(
     if ws is None or ws.max_row < 2:
         return f"<tr><td colspan='{len([c for c in columns if c != 'URL']) + 1}'>{_escape(empty_message)}</td></tr>", 0
 
+    from src.matching import excluded_title_term
+    profile = yaml.safe_load(CV_PROFILE_FILE.read_text(encoding="utf-8")) if CV_PROFILE_FILE.exists() else {}
     url_col = columns.index("URL") + 1
     title_col = columns.index("Job Title")
 
@@ -63,7 +66,7 @@ def _render_table(
         if all(v is None for v in values):
             continue  # skip fully-empty rows
         record = dict(zip(columns, values))
-        if excluded_seniority(record.get('Job Title')) or not allowed_job({'city':record.get('City'), 'company':record.get('Company'), 'url':record.get('URL'), 'location':record.get('Location')}):
+        if excluded_title_term(record.get('Job Title'), (profile or {}).get('title_must_not_match', [])) or not allowed_job({'city':record.get('City'), 'company':record.get('Company'), 'url':record.get('URL'), 'location':record.get('Location')}):
             continue
         is_highlighted = _rgb_matches(ws.cell(row=row, column=1), new_row_fill)
         url = str(values[url_col - 1] or "#")
@@ -109,7 +112,7 @@ def _section_html(title: str, columns: list[str], rows_html: str, total: int, le
 
 def _records(ws):
     """Presentation only: preserve the installed scope/seniority guards and ordering."""
-    from src.matching import parse_posted
+    from src.matching import parse_posted, keep_posted, excluded_title_term
     if ws is None:return []
     records=[]
     profile=yaml.safe_load(CV_PROFILE_FILE.read_text(encoding="utf-8")) if CV_PROFILE_FILE.exists() else {}
@@ -117,9 +120,10 @@ def _records(ws):
     for row in range(2,ws.max_row+1):
         record={col:ws.cell(row,i+1).value for i,col in enumerate(COLUMNS)}
         if all(v is None for v in record.values()):continue
-        if excluded_seniority(record.get('Job Title')) or not allowed_job({'city':record.get('City'),'company':record.get('Company'),'url':record.get('URL'),'location':record.get('Location')}):continue
+        if excluded_title_term(record.get('Job Title'), (profile or {}).get('title_must_not_match', [])) or not allowed_job({'city':record.get('City'),'company':record.get('Company'),'url':record.get('URL'),'location':record.get('Location')}):continue
         if record.get('Match Type')=='Related role' and not related_enabled:continue
         raw=record.get('Job Posted');posted=parse_posted(raw)
+        if not keep_posted(raw):continue
         score=record.get('Relevance Score (1-10)');score=score if isinstance(score,(int,float)) else 0
         if record.get('Match Type')=='Related role' and not 7 <= score <= 10:continue
         rank,area=area_priority(record.get('Location'))
@@ -143,7 +147,7 @@ def _card(r,index):
     reason=e(r.get('match_reason') or 'Direct title match; existing keyword scoring rules apply.')
     link=f"<a class='apply' href='{url}' target='_blank' rel='noopener noreferrer'>Open vacancy &#8599;</a>" if r['url'] else 'Link unavailable'
     cls='job-row is-new' if r['new'] else 'job-row'
-    return f"""<article class='{cls}'><div class='role'><div class='title-line'>{badge}<h2>{title_link}</h2>{related}</div><p class='employer'>{e(r['company'])}</p></div><div class='workplace'>{e(r['location'])}</div><div class='score-cell'><span class='score' title='Keyword relevance, not hiring probability'><b>{r['score']:g}</b>/10</span></div><div class='posted'>{e(date)}</div><details class='row-details'><summary>Details</summary><div class='detail-body'><strong>{title}</strong><p>{e(r['company'])} · {e(r['location'])}</p><p>{reason}</p><p>{e(r['area'])} · {e(date)} · Keyword relevance {r['score']:g}/10</p><p>Full responsibilities and requirements are on the employer’s vacancy page; they are not stored in this workbook.</p>{link}</div></details></article>"""
+    return f"""<article class='{cls}'><div class='role'><div class='title-line'>{badge}<h2>{title_link}</h2>{related}</div><p class='employer'>{e(r['company'])}</p></div><div class='workplace'>{e(r['location'])}</div><div class='score-cell'><span class='score' title='Keyword relevance, not hiring probability'><b>{r['score']:g}</b>/10</span></div><div class='posted'>{e(date)}</div><div class='action'>{link}</div></article>"""
 
 LIST_STYLE=r"""
 .shell{max-width:1340px;padding:25px 28px}.nav{max-width:1340px;padding:16px 28px}.list-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:18px}.list-heading h1{font-size:27px;letter-spacing:-.8px;margin:0 0 5px}.list-heading p{margin:0;color:var(--muted);font-size:12px}.list-heading .stamp{font-size:11px;padding:9px 12px}.job-list{border:1px solid var(--line);border-radius:16px;background:white;overflow:hidden}.list-columns,.job-row{display:grid;grid-template-columns:minmax(0,2.6fr) minmax(0,1.3fr) 130px 150px 115px;gap:22px;align-items:center;padding:20px 24px}.list-columns{background:#edf3f4;padding-top:12px;padding-bottom:12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)}.job-row{border-top:1px solid #e8eef1}.job-row:hover{background:#f7fbfa}.job-row h2{font-size:17px;line-height:1.45;letter-spacing:-.2px;margin:0 0 6px;overflow-wrap:anywhere}.job-row h2 a{color:var(--ink);text-decoration:none}.job-row h2 a:hover{text-decoration:underline}.job-row .employer{font-size:12px;margin:0 0 5px;font-weight:400}.workplace,.posted{font-size:12px;color:var(--muted);overflow-wrap:anywhere}.area-label{display:block;font-size:10px;color:var(--accent);margin-top:5px}.action{text-align:right}.mobile-label{display:none}.health-panel{max-width:1284px}.score{display:inline-block}.scope-note{font-size:11px;color:var(--muted);margin-top:14px}.empty{border:0}.job-row .pill.new{font-size:10px;padding:2px 8px}@media(max-width:1050px){.list-columns,.job-row{grid-template-columns:minmax(0,2fr) minmax(0,1fr) 100px 125px;gap:15px}.list-columns span:last-child{display:none}.action{grid-column:1/-1;text-align:left}}@media(max-width:700px){.shell{padding:22px 16px}.nav{padding:14px 16px}.list-heading{display:block}.list-heading .stamp{display:inline-block;margin-top:12px}.list-columns{display:none}.job-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding:20px 18px;gap:15px}.role{grid-column:1/-1}.job-row h2{font-size:18px}.mobile-label{display:block;font-size:10px;margin-bottom:6px;color:var(--muted)}.posted{grid-column:1/-1}.action{grid-column:1/-1}.health-panel{margin:0 16px 25px}.nav small{display:none}}
@@ -165,9 +169,23 @@ def generate(tracker_path: Path = TRACKER_FILE, output_path: Path = OUTPUT_FILE)
     finally:
         if wb:wb.close()
     stamp=dt.datetime.now(dt.timezone.utc).strftime('%d %b %Y, %H:%M UTC')
+    build_id=os.getenv('GITHUB_RUN_ID','local')+'-'+os.getenv('GITHUB_RUN_ATTEMPT','1')
+    health_message='Source coverage not checked for this page.'
+    try:
+        from collections import Counter
+        health=json.loads((output_path.parent/'scraper_health.json').read_text(encoding='utf-8'))
+        statuses=Counter(row.get('status','UNKNOWN') for row in health.get('companies',[]))
+        failed=sum(statuses.get(key,0) for key in ('ERROR','FAILED_OR_BLOCKED','EXTRACTION_INCOMPLETE'))
+        empty=statuses.get('EMPTY_UNVERIFIED',0)
+        partial=statuses.get('PARTIAL_OR_WARNING',0)
+        health_message=f'Coverage: {failed} failed/blocked, {empty} unverified empty, {partial} partial sources. See source health; a completed run does not mean full coverage.'
+    except (OSError,ValueError,TypeError,AttributeError):
+        pass
     new_count=sum(bool(r['new']) for r in records)
     cards=''.join(("<div class='batch-title'>New this update</div>" if i==0 and r['new'] else "<div class='batch-title existing'>Already tracked</div>" if (i==0 or records[i-1]['new']) and not r['new'] else '')+_card(r,i) for i,r in enumerate(records)) or "<div class='empty'><strong>No tracked jobs to display</strong>Results appear after a successful tracker update.</div>"
-    html=f"""<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Munich Job Tracker</title><style>{STYLE}{LIST_STYLE}{SCAN_STYLE}</style></head><body><a class='skip' href='#jobs'>Skip to jobs</a><header class='topbar'><div class='nav'><div class='brand'><span class='mark' aria-hidden='true'>m.</span>Munich Job Tracker</div><small>New first · Munich region</small><a href='#scraper-health'>Source health &#8595;</a></div></header><main class='shell'><section aria-labelledby='jobs-title'><div class='list-heading'><div><h1 id='jobs-title'>Your opportunities</h1><p class='scan-summary'><strong>{new_count} new this update</strong> · {len(records)} total · all jobs shown</p></div><div class='stamp'>Page generated<strong>{stamp}</strong>Not a guarantee of source freshness</div></div><div class='job-list' id='jobs'><div class='list-columns' aria-hidden='true'><span>Role &amp; employer</span><span>Workplace</span><span>Keyword relevance</span><span>Posting date</span><span>Details</span></div>{cards}</div><p class='scope-note'>Munich metropolitan region · 21-day rule plus undated jobs · no commute cutoff. “New this update” means added in the latest tracker update, not newly posted or unread. Within each group: preferred areas, then relevance. Keyword scores reflect existing rules, not hiring probability.</p></section></main></body></html>"""
-    output_path.write_text(html,encoding='utf-8')
+    html=f"""<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='tracker-build' content='{_escape(build_id)}'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Munich Job Tracker</title><style>{STYLE}{LIST_STYLE}{SCAN_STYLE}.job-row .action{{text-align:right}}@media(max-width:800px){{.job-row .action{{grid-column:2;grid-row:2/4}}}}</style></head><body><a class='skip' href='#jobs'>Skip to jobs</a><header class='topbar'><div class='nav'><div class='brand'><span class='mark' aria-hidden='true'>m.</span>Munich Job Tracker</div><small>New first · Munich region</small><a href='#scraper-health'>Source health &#8595;</a></div></header><main class='shell'><p class='scope-note'>{_escape(health_message)}</p><section aria-labelledby='jobs-title'><div class='list-heading'><div><h1 id='jobs-title'>Your opportunities</h1><p class='scan-summary'><strong>{new_count} new this update</strong> · {len(records)} total · all jobs shown</p></div><div class='stamp'>Page generated<strong>{stamp}</strong>Build {_escape(build_id)} · <a href='run_summary.json'>Run summary</a></div></div><div class='job-list' id='jobs'><div class='list-columns' aria-hidden='true'><span>Role &amp; employer</span><span>Workplace</span><span>Keyword relevance</span><span>Posting date</span><span>Open</span></div>{cards}</div><p class='scope-note'>Munich metropolitan region · 21-day rule plus undated jobs · no commute cutoff. “New this update” means added in the latest tracker update, not newly posted or unread. Within each group: preferred areas, then relevance. Keyword scores reflect existing rules, not hiring probability.</p></section></main></body></html>"""
+    pending=output_path.with_suffix('.pending.html')
+    pending.write_text(html,encoding='utf-8')
+    pending.replace(output_path)
 
 if __name__=='__main__':generate()

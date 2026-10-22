@@ -106,6 +106,7 @@ def scrape_all_any_city(companies,cv_profile):
                 readable=[j for j in recent if usable_title(j.get('title','')) and not j.get('_needs_title')]
                 row['extraction_unresolved']=len(recent)-len(readable)
                 titled=[]
+                readable.sort(key=lambda j: (not title_decision(j['title'], cv_profile.get('title_must_match', []), cv_profile.get('title_must_not_match', []))['keep'], location_decision(j)['status'] != 'confirmed'))
                 for job in readable:
                     if related_role_candidate(job['title'],cv_profile) and location_decision(job)['status'] not in ('outside','excluded') and not job.get('description'):
                         details,body=cached_details(job.get('_detail_api_url') or job.get('url',''),row)
@@ -126,7 +127,8 @@ def scrape_all_any_city(companies,cv_profile):
                     loc_before=location_decision(job)
                     # Known outside/excluded locations do not need expensive details.
                     if loc_before['status'] not in ('outside','excluded') and job.get('url') and (loc_before['status']=='unconfirmed' or not job.get('description') or not job.get('posted_date')):
-                        details,_=cached_details(job.get('_detail_api_url') or job['url'],row);enrich(job,details)
+                        details,body=cached_details(job.get('_detail_api_url') or job['url'],row);enrich(job,details)
+                        if not job.get('description') and body:job['description']=body
                     decision=audit_date(row,job,'after_detail')
                     if not decision['keep']:row['date_rejected']+=1;continue
                     job=filter_recent_jobs([job])[0]
@@ -165,7 +167,14 @@ def run():
     jobs,counts,reports=scrape_all_any_city(companies,profile)
     if not reports or not any(row.get('raw_candidates',0)>row.get('extraction_unresolved',0) for row in reports) or all(row['status'] in ('ERROR','FAILED_OR_BLOCKED','EMPTY_UNVERIFIED','EXTRACTION_INCOMPLETE') for row in reports):
         raise RuntimeError('No usable source results; existing tracker and webpage retained.')
-    summary=update_tracker(TRACKER_FILE,jobs,min_score=profile.get('main_min_score',0),related_roles_enabled=(profile.get('related_roles') or {}).get('enabled') is True)
+    summary=update_tracker(TRACKER_FILE,jobs,min_score=profile.get('main_min_score',0),related_roles_enabled=(profile.get('related_roles') or {}).get('enabled') is True,cv_profile=profile)
     generate_html();append_to_page(reports,ROOT/'docs/index.html')
+    import json, os
+    from datetime import datetime, timezone
+    status_counts=counts['source_statuses']
+    summary_path=ROOT/'docs/run_summary.json'
+    summary_path.write_text(json.dumps(dict(generated_at=datetime.now(timezone.utc).isoformat(),run_id=os.getenv('GITHUB_RUN_ID','local'),run_attempt=os.getenv('GITHUB_RUN_ATTEMPT','1'),source_commit=os.getenv('TRACKER_SOURCE_COMMIT',os.getenv('GITHUB_SHA','local')),counts=counts,tracker=summary,coverage_degraded=any(r['status'] in ('ERROR','FAILED_OR_BLOCKED','EMPTY_UNVERIFIED','EXTRACTION_INCOMPLETE','PARTIAL_OR_WARNING') for r in reports)),indent=2),encoding='utf-8')
+    if status_counts.get('FAILED_OR_BLOCKED',0) or status_counts.get('EMPTY_UNVERIFIED',0):
+        logger.warning('Coverage degraded: %s blocked/failed and %s unverified empty sources. A completed run does not mean complete coverage.',status_counts.get('FAILED_OR_BLOCKED',0),status_counts.get('EMPTY_UNVERIFIED',0))
     logger.info('Run counts: %s | Tracker: %s',counts,summary)
 if __name__=='__main__':run()

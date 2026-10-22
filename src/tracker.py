@@ -104,11 +104,13 @@ def _ensure_sheet(wb: Workbook, sheet_name: str, columns: list[str], widths: lis
         _migrate_sheet(wb, sheet_name, columns, widths, sheet_index)
 
 
-def load_or_create(path: Path) -> Workbook:
+def load_or_create(path: Path, cv_profile=None) -> Workbook:
     if not path.exists():
         return _new_workbook()
 
     wb = load_workbook(path)
+    from src.matching import excluded_title_term
+    profile = cv_profile or {}
     _ensure_sheet(wb, "Jobs", COLUMNS, COLUMN_WIDTHS, 0)
     # Active workbook is Munich-only; historical archives are not modified.
     for name in list(wb.sheetnames):
@@ -117,7 +119,7 @@ def load_or_create(path: Path) -> Workbook:
     ws = wb['Jobs']
     for row in range(ws.max_row, 1, -1):
         record = {col: ws.cell(row, i + 1).value for i, col in enumerate(COLUMNS)}
-        if excluded_seniority(record.get('Job Title')) or not allowed_job({'city':record.get('City'), 'company':record.get('Company'), 'url':record.get('URL'), 'location':record.get('Location')}):
+        if excluded_title_term(record.get('Job Title'), profile.get('title_must_not_match', [])) or not allowed_job({'city':record.get('City'), 'company':record.get('Company'), 'url':record.get('URL'), 'location':record.get('Location')}):
             ws.delete_rows(row)
     return wb
 
@@ -201,8 +203,10 @@ def _update_sheet(
             url_col = columns.index("URL") + 1
             for existing_row in range(2, ws.max_row + 1):
                 if ws.cell(existing_row, url_col).value == url:
-                    for key, label in (("match_type", "Match Type"), ("match_reason", "Match Reason")):
-                        if label in columns and job.get(key):ws.cell(existing_row, columns.index(label)+1).value = job[key]
+                    fresh = row_builder(job, url)
+                    for index, value in enumerate(fresh, start=1):
+                        if value is not None and value != "":
+                            ws.cell(existing_row, index).value = value
                     break
             continue
         ws.append(row_builder(job, url))
@@ -229,8 +233,11 @@ def _build_jobs_row(job: dict[str, Any], url: str) -> list:
     ]
 
 
-def update_tracker(path: Path, new_jobs: list[dict[str, Any]], min_score: int = 0, related_roles_enabled: bool = True) -> dict[str, int]:
-    wb = load_or_create(path)
+def update_tracker(path: Path, new_jobs: list[dict[str, Any]], min_score: int = 0, related_roles_enabled: bool = True, cv_profile=None) -> dict[str, int]:
+    from src.matching import excluded_title_term
+    profile = cv_profile or {}
+    new_jobs = [j for j in new_jobs if not excluded_title_term(j.get("title"), profile.get("title_must_not_match", []))]
+    wb = load_or_create(path, cv_profile=cv_profile)
     if not related_roles_enabled:
         ws = wb["Jobs"]
         match_col = COLUMNS.index("Match Type") + 1

@@ -193,17 +193,28 @@ def normalized_title(value):
     return text.strip()
 
 def excluded_seniority(title):
-    """Explicit junior/entry-level title labels only; never description mentions."""
-    import unicodedata
-    text=unicodedata.normalize('NFKC',str(title or '')).casefold()
-    text=''.join(c for c in text if unicodedata.category(c)!='Cf')
-    text=re.sub(r'[\s\u2010-\u2015_-]+',' ',text)
-    return bool(re.search(r'(?<!\w)(?:junior|jr\.?|entry\s*level|berufseinsteiger(?:in|innen)?)(?!\w)',text))
+    """Compatibility hook. Seniority is controlled by profile exclusions only.
+
+    Never impose the PM tracker's junior exclusion on an ESG junior/mid profile.
+    """
+    return False
+
+def excluded_title_term(title, terms):
+    text = normalized_title(title)
+    for term in terms or []:
+        token = normalized_title(term)
+        if not token:
+            continue
+        # Preserve configured German compound exclusions, but do not let
+        # 'intern' reject 'international', or 'partner' reject 'partnerships'.
+        pattern = (re.escape(token) + r'(?!\w)') if token in ('leiter', 'leitung') else (r'(?<!\w)' + re.escape(token) + r'(?!\w)')
+        if re.search(pattern, text):
+            return term
+    return None
 
 def title_decision(title,must_match,must_not_match=None):
-    if excluded_seniority(title):return {'keep':False,'reason':'excluded_junior_seniority','term':'junior / entry-level'}
     text=normalized_title(title)
-    excluded=next((term for term in (must_not_match or []) if normalized_title(term) in text),None)
+    excluded=excluded_title_term(title, must_not_match)
     included=next((term for term in must_match if normalized_title(term) in text),None)
     if excluded:return {'keep':False,'reason':'excluded_title_term','term':excluded}
     return {'keep':bool(included),'reason':'matched_title_term' if included else 'no_requested_title_term','term':included or ''}

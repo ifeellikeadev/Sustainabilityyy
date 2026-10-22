@@ -454,7 +454,7 @@ def scrape_html_board(name,url,get,max_pages=MAX_PAGES,seconds=SOURCE_SECONDS):
     return _tag(jobs,stats)
 
 
-def browse_public_board(name,url,seconds=BROWSER_SECONDS):
+def _browse_public_board(name,url,seconds=BROWSER_SECONDS):
     started=time.monotonic();jobs=[];pages=0;reason='no_next_control_unverified';browser=None;search_submitted=False
     if seconds<=0:return [],{'pages':0,'completion':'source_budget_exhausted','unique_candidates':0}
     try:
@@ -539,6 +539,19 @@ def browse_public_board(name,url,seconds=BROWSER_SECONDS):
         reason='browser_error';logger.warning('Public-board browser failed for %s: %s',name,str(exc)[:250])
     return jobs,{'pages':pages,'completion':reason,'unique_candidates':len(jobs)}
 
+
+def browse_public_board(name, url, seconds=BROWSER_SECONDS):
+    """Charge all paginated browser recovery to the shared browser budget."""
+    global _headless_time_used
+    seconds = min(seconds, headless_budget_remaining())
+    if seconds <= 0:
+        logger.warning('Browser budget exhausted; coverage unverified for %s', name)
+        return [], {'pages': 0, 'completion': 'browser_budget_exhausted', 'unique_candidates': 0}
+    started = time.monotonic()
+    try:
+        return _browse_public_board(name, url, seconds=seconds)
+    finally:
+        _headless_time_used += time.monotonic() - started
 
 def scrape_eightfold(name,url,domain,get,max_pages=500,seconds=SOURCE_SECONDS):
     """Public Eightfold route; runtime response schema and coverage remain checked.
@@ -1049,7 +1062,7 @@ def scrape_workday(company_name: str, careers_url: str) -> list[dict[str, Any]]:
     repeated_recovery=False
     source_started=time.monotonic()
     for _ in range(500):
-        if time.monotonic()-source_started>=150:
+        if time.monotonic()-source_started>=120:
             completion='time_limit';logger.warning('Workday incomplete pagination: time limit; retaining %s candidates',len(jobs));break
         try:
             resp = requests.post(api_url, json={"limit": request_limit, "offset": offset, "searchText": "", "appliedFacets": {}}, headers=HEADERS, timeout=request_timeout(TIMEOUT))
@@ -1078,7 +1091,7 @@ def scrape_workday(company_name: str, careers_url: str) -> list[dict[str, Any]]:
             seen.add(path);added += 1
             jobs.append({"title": (posting.get("title") or "").strip(), "location": posting.get("locationsText", ""),
                          "url": base + path, "description": "", "posted_date": normalize_fresh_posted(posting.get("postedOn", "")),
-                         "_extraction": "workday_api"})
+                         "_extraction": "workday_api", "_detail_api_url": api_url.rsplit("/jobs", 1)[0] + path})
             stamp_date(jobs[-1],posting.get("postedOn", ""),"postedOn")
         checkpoint(jobs)
         if not added:
@@ -1382,7 +1395,7 @@ def _recover_thin_result(company_name: str, careers_url: str, current_result: li
             elif platform == "workday":
                 candidate = scrape_workday(company_name, discovered_url)
             else:
-                candidate = scrape_generic(company_name, discovered_url)
+                candidate = scrape_html_board(company_name, discovered_url, _safe_get)
         except Exception as exc:
             logger.warning('Discovered board failed for %s; keeping existing candidates: %s',company_name,str(exc)[:200])
             candidate = []
@@ -1403,7 +1416,7 @@ def _recover_thin_result(company_name: str, careers_url: str, current_result: li
     if _HTTP_STATUS.get(best_url) in (401,403,429):
         logger.warning('Access/rate limit for %s; no browser retry against the same URL',company_name)
         return best_result
-    headless_result = scrape_headless(company_name, best_url)
+    headless_result = scrape_html_board(company_name, best_url, _safe_get)
     from src.extraction import dedupe
     return dedupe(best_result + headless_result)
 
@@ -1515,6 +1528,33 @@ def fetch_job_details(url):
     resp = _safe_get(url)
     if resp is None:
         return {}, ''
+    parsed_url = urlparse(url)
+    if (parsed_url.hostname or '').endswith('.myworkdayjobs.com') and '/wday/cxs/' in parsed_url.path:
+        try:
+            data = resp.json()
+        except (ValueError, TypeError):
+            logger.warning('Workday detail is not JSON: %s', url)
+            return {}, ''
+        info = data.get('jobPostingInfo') if isinstance(data, dict) else None
+        if not isinstance(info, dict):
+            logger.warning('Workday detail schema unrecognised: %s', url)
+            return {}, ''
+        desc = plain(info.get('jobDescription'))
+        places = []
+        for value in [info.get('location')] + list(info.get('additionalLocations') or []):
+            if isinstance(value, str) and value.strip():places.append(value.strip())
+            elif isinstance(value, dict):
+                text = value.get('location') or value.get('name')
+                if isinstance(text, str) and text.strip():places.append(text.strip())
+        details = dict(title=plain(info.get('title')), description=desc,
+                       location='; '.join(dict.fromkeys(places)),
+                       _location_source='workday_jobPostingInfo')
+        # startDate can mean employment start; never use it as publication evidence.
+        raw_date = info.get('postedOn') or ''
+        if raw_date:
+            details['posted_date'] = normalize_fresh_posted(raw_date)
+            stamp_date(details, raw_date, 'postedOn', source=url)
+        return details, desc
     if urlparse(url).hostname == 'api.smartrecruiters.com':
         data = resp.json()
         sections = (data.get('jobAd') or {}).get('sections') or {}
@@ -1548,4 +1588,12 @@ def fetch_job_details(url):
             details['posted_date'] = posted.get('content') or posted.get('datetime') or posted.get_text(' ',strip=True)
             stamp_date(details,details['posted_date'],'datePosted',source=url)
     for tag in soup(['script','style','nav','footer','header']):tag.decompose()
-    return details, soup.get_text(' ',strip=True)[:10000]
+    # Do not score navigation, equal-opportunity statements or unrelated jobs.
+    description_tag = soup.select_one('[itemprop="description"],.job-description,.jobDescription,[data-ph-at-id="job-description"],#job-description')
+    if description_tag is not None:
+        desc = description_tag.get_text(' ', strip=True)
+        if desc and not details.get('description'):details['description'] = desc
+    # Only return a bounded vacancy body, never the entire corporate page.
+    body = soup.select_one('main,article')
+    fallback = body.get_text(' ', strip=True)[:20000] if body is not None and details.get('title') else ''
+    return details, details.get('description') or fallback
