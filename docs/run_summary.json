@@ -1,0 +1,29 @@
+{
+  "generated_at": "2026-10-22T10:10:04.922019+00:00",
+  "run_id": "39755051281",
+  "run_attempt": "1",
+  "source_commit": "dccb1279f1c8aaade371f8b591825939239ebf89",
+  "counts": {
+    "ok": 176,
+    "empty": 125,
+    "errored": 0,
+    "total": 301,
+    "title_matched": 25,
+    "location_confirmed": 2,
+    "source_statuses": {
+      "PARTIAL_OR_WARNING": 60,
+      "FAILED_OR_BLOCKED": 125,
+      "NO_MATCHES_IN_EXTRACTED_RESULTS": 114,
+      "MATCHES_FOUND": 1,
+      "EXTRACTION_INCOMPLETE": 1
+    }
+  },
+  "tracker": {
+    "added": 0,
+    "already_tracked": 2,
+    "pruned": 0,
+    "total_rows": 4,
+    "related_score_pruned": 0
+  },
+  "coverage_degraded": true
+}
