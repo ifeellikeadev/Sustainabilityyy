@@ -1,250 +1,426 @@
+# Profile: GHG-Reporting & ESG data specialist (M.Sc. Sustainable Resource Management)
+# Matching is assumed to be case-insensitive substring matching, like the original file.
+
 title_must_match:
-- project manager
-- programme manager
-- program manager
-- projektmanager
-- projektleiter
-- senior project manager
-- technical project manager
-- it project manager
-- delivery manager
-- projektleder
-- prosjektleder
-- projektipäällikkö
-- projektipaallikko
-- projectmanager
-- projectleider
-- chef de projet
-- gestionnaire de projet
-- project lead
-- program lead
-- delivery lead
-- portfolio manager
-- pmo manager
-- implementation manager
+# --- Sustainability / ESG (EN) ---
+- sustainability
+- esg
+- csrd
+- esrs
+- ghg
+- carbon
+- co2
+- net zero
+- net-zero
+- climate
+- decarbonization
+- decarbonisation
+- environmental
+- life cycle assessment
+- sustainable finance
+- impact analyst
+- impact manager
+# --- Sustainability / ESG (DE) ---
+- nachhaltigkeit
+- klimaschutz
+- klimamanager
+- klimadaten
+- klimabilanz
+- thg
+- treibhausgas
+- dekarbonisierung
+- umweltmanager
+- umweltberater
+- umweltwissenschaft
+- umweltanalyst
+- umweltreferent
+- ökobilanz
+- oekobilanz
+- lebenszyklusanalyse
+- nachhaltige finanz
+- referent nachhaltigkeit
+- nachhaltigkeitsreferent
+- nachhaltigkeitsberater
+- nachhaltigkeitsmanager
+# --- Adjacent: data / reporting with a sustainability angle ---
+- data analyst
+- datenanalyst
+- reporting analyst
+- reporting specialist
+- research analyst
+- sustainability data
+- esg data
+- carbon accountant
+- climate risk
+- klimarisiko
+
 title_must_not_match:
-- stadionbau
-- elektrotechnik
-- hochbau
-- wohnungsbau
-- museumsbau
-- tiefbau
-- rohbau
+# Not the right level / type of role
+- werkstudent
+- praktikum
+- praktikant
+- internship
+- intern 
+- working student
+- ausbildung
+- azubi
+# Wrong "Klima" / "Umwelt" meaning (building services, trades)
+- klimatechnik
+- klimaanlage
+- kältetechnik
+- kaeltetechnik
 - gebäudetechnik
 - gebaudetechnik
 - hlk
 - sanitärtechnik
 - sanitartechnik
+- elektrotechnik
 - bauleiter
-- bauen im bestand
-- schlüsselfertig
-- schlusselfertig
-- mieterausbau
-- dachgeschossausbau
+- monteur
+- servicetechniker
+- umweltschutztechnischer assistent
+# Sales / unrelated
+- vertrieb
+- sales
+- account executive
+- außendienst
+- aussendienst
+- fahrer
+
 main_min_score: 3
 score_ceiling: 20
+
 scoring_keywords:
-- term: aerospace
+# --- Core: GHG / carbon accounting (weight 5) ---
+- term: GHG
   weight: 5
-- term: Luft- und Raumfahrt
+- term: greenhouse gas
   weight: 5
-- term: Luftfahrt
+- term: Treibhausgas
   weight: 5
-- term: defence
+- term: THG-Bilanzierung
   weight: 5
-- term: defense
-  weight: 5
-- term: Verteidigung
-  weight: 5
-- term: Wehrtechnik
-  weight: 5
-- term: Rüstung
-  weight: 5
-- term: military
+- term: THG
   weight: 4
-- term: Militär
+- term: GHG Protocol
+  weight: 5
+- term: carbon accounting
+  weight: 5
+- term: carbon footprint
+  weight: 5
+- term: CO2-Fußabdruck
+  weight: 5
+- term: CO2-Bilanzierung
+  weight: 5
+- term: CO2-Bilanz
   weight: 4
-- term: militärisch
+- term: Scope 3
+  weight: 5
+- term: Scope 1
+  weight: 3
+- term: Scope 2
+  weight: 3
+- term: emissions
+  weight: 3
+- term: Emissionen
+  weight: 3
+# --- Core: ESG / CSRD reporting (weight 5) ---
+- term: ESG
+  weight: 5
+- term: CSRD
+  weight: 5
+- term: ESRS
   weight: 4
-- term: energy
-  weight: 2
-- term: Energie
-  weight: 2
-- term: electricity market
+- term: sustainability reporting
+  weight: 5
+- term: Nachhaltigkeitsberichterstattung
+  weight: 5
+- term: Nachhaltigkeitsbericht
+  weight: 4
+- term: sustainability
   weight: 3
-- term: Strommarkt
+- term: Nachhaltigkeit
   weight: 3
-- term: grid
-  weight: 2
-- term: Stromnetz
-  weight: 2
-- term: Übertragungsnetz
-  weight: 2
-- term: EU regulatory
+- term: EU Taxonomy
+  weight: 4
+- term: EU-Taxonomie
+  weight: 4
+- term: Taxonomie
   weight: 3
+- term: sustainable finance
+  weight: 4
+- term: nachhaltige Finanzen
+  weight: 4
+- term: NZAOA
+  weight: 3
+- term: Net Zero
+  weight: 4
+- term: Netto-Null
+  weight: 4
+- term: Klimaneutralität
+  weight: 3
+- term: decarbonization
+  weight: 3
+- term: decarbonisation
+  weight: 3
+- term: Dekarbonisierung
+  weight: 3
+# --- Assurance / methodology (weight 3-4) ---
+- term: ISAE 3000
+  weight: 4
+- term: assurance
+  weight: 3
+- term: external audit
+  weight: 3
+- term: Prüfung
+  weight: 2
+- term: Wirtschaftsprüfung
+  weight: 2
+- term: methodology
+  weight: 3
+- term: Methodik
+  weight: 3
+- term: Methodenentwicklung
+  weight: 3
+# --- Models / data sources / tools (weight 2-4) ---
+- term: input-output
+  weight: 4
+- term: Input-Output-Modell
+  weight: 4
+- term: EXIOBASE
+  weight: 4
+- term: EORA
+  weight: 3
+- term: life cycle assessment
+  weight: 4
+- term: LCA
+  weight: 3
+- term: Ökobilanz
+  weight: 4
+- term: Lebenszyklusanalyse
+  weight: 4
+- term: OpenLCA
+  weight: 3
+- term: MSCI
+  weight: 2
+- term: RepRisk
+  weight: 2
+- term: ESG data
+  weight: 4
+- term: ESG-Daten
+  weight: 4
+- term: Nachhaltigkeitsdaten
+  weight: 4
+- term: data quality
+  weight: 2
+- term: Datenqualität
+  weight: 2
+- term: data analysis
+  weight: 2
+- term: Datenanalyse
+  weight: 2
+- term: Python
+  weight: 2
+- term: R
+  weight: 0
+- term: Excel
+  weight: 1
+- term: ArcGIS
+  weight: 1
+- term: climate modelling
+  weight: 3
+- term: Klimamodellierung
+  weight: 3
+- term: remote sensing
+  weight: 1
+- term: Fernerkundung
+  weight: 1
+# --- Regulatory / risk / sector (weight 2-3) ---
 - term: regulatory compliance
   weight: 3
+- term: compliance
+  weight: 1
 - term: regulatorische Anforderungen
   weight: 3
 - term: Regulatorik
   weight: 3
-- term: compliance
-  weight: 1
-- term: PMP
+- term: climate risk
+  weight: 3
+- term: Klimarisiko
+  weight: 3
+- term: risk assessment
   weight: 2
-- term: CAPM
-  weight: 1
-- term: PMI
-  weight: 1
-- term: risk management
+- term: Risikobewertung
   weight: 2
-- term: Risikomanagement
+- term: banking
   weight: 2
-- term: risk
+- term: Bank
   weight: 1
-- term: Risiko
+- term: financial services
+  weight: 2
+- term: Finanzdienstleistung
+  weight: 2
+- term: asset management
+  weight: 2
+- term: Vermögensverwaltung
+  weight: 2
+- term: investment
   weight: 1
+- term: clean energy
+  weight: 3
+- term: saubere Energie
+  weight: 3
+- term: erneuerbare Energien
+  weight: 3
+- term: renewable energy
+  weight: 3
+- term: energy
+  weight: 2
+- term: Energie
+  weight: 2
+- term: air quality
+  weight: 1
+- term: Luftqualität
+  weight: 1
+- term: policy
+  weight: 1
+- term: Politik
+  weight: 1
+# --- Working style / soft skills (weight 1-2) ---
+- term: stakeholder
+  weight: 2
 - term: stakeholder management
   weight: 2
-- term: stakeholder
+- term: cross-functional
   weight: 1
-- term: supply chain
-  weight: 2
-- term: Lieferkette
-  weight: 2
-- term: procurement
-  weight: 2
-- term: Beschaffung
-  weight: 2
-- term: Einkauf
-  weight: 2
-- term: crisis management
-  weight: 2
-- term: Krisenmanagement
-  weight: 2
+- term: bereichsübergreifend
+  weight: 1
+- term: funktionsübergreifend
+  weight: 1
+- term: interdisziplinär
+  weight: 1
+- term: international
+  weight: 1
+- term: project management
+  weight: 1
+- term: Projektmanagement
+  weight: 1
 - term: agile
   weight: 1
 - term: agil
   weight: 1
-- term: waterfall
-  weight: 1
-- term: Wasserfallmethode
-  weight: 1
-- term: Wasserfallmodell
-  weight: 1
-- term: IT project
-  weight: 2
-- term: IT-Projekt
-  weight: 2
-- term: IT solutions
-  weight: 1
-- term: IT-Lösung
-  weight: 1
-- term: process improvement
-  weight: 1
-- term: Prozessverbesserung
-  weight: 1
-- term: Prozessoptimierung
-  weight: 1
-- term: governance
-  weight: 1
-- term: SAP
+- term: Scrum
   weight: 1
 - term: Jira
   weight: 1
-- term: cross-functional
+- term: Confluence
   weight: 1
-- term: funktionsübergreifend
+- term: presentation
   weight: 1
-- term: bereichsübergreifend
+- term: Präsentation
   weight: 1
-- term: tender
+- term: procurement
   weight: 1
-- term: Ausschreibung
+- term: Beschaffung
   weight: 1
-- term: audit
+- term: quality management
   weight: 1
-- term: budget
-  weight: 1
-- term: leadership
-  weight: 1
-- term: Führungskompetenz
-  weight: 1
-- term: Führungserfahrung
-  weight: 1
-- term: negotiation
-  weight: 1
-- term: Verhandlung
+- term: Qualitätsmanagement
   weight: 1
 
 # Set enabled to false to disable the related-role trial.
+# Idea: catch generic analyst / consultant / specialist titles whose body text
+# shows sustainability-data or reporting responsibilities.
 related_roles:
   enabled: true
   min_responsibility_groups: 2
   required_any_group:
-  - delivery
-  - governance
-  - transformation
+  - ghg_accounting
+  - esg_reporting
+  - sustainable_finance
   candidate_title_patterns:
   - \bconsultants?\b
   - \bconsulting\b
-  - \b(?:unternehmens|management|organisations|prozess)?berater(?:in)?\b
+  - \b(?:unternehmens|management|nachhaltigkeits|umwelt|klima)?berater(?:in)?\b
+  - \banalysts?\b
+  - \banalyst(?:in)?\b
+  - \bspecialists?\b
+  - \bspezialist(?:in)?\b
+  - \breferent(?:in)?\b
+  - \bresearcher\b
+  - \bexpert(?:e|in)?\b
   - \badvis(?:or|er|ory)\b
-  - \btransformation (?:lead|manager)\b
   responsibility_groups:
-    delivery:
-    - project delivery
-    - programme delivery
-    - program delivery
-    - project planning
-    - project management
-    - project implementation
-    - project coordination
-    - projektmanagement
-    - projektplanung
-    - projektsteuerung
-    - projektdurchfuehrung
-    - projektabwicklung
-    - projektleitung
-    governance:
-    - project governance
-    - programme governance
-    - program governance
-    - project portfolio
-    - portfolio management
-    - pmo
-    - projektportfolio
-    - projektcontrolling
-    risk_budget:
-    - budget management
-    - budget responsibility
-    - budget control
-    - financial control
-    - risk management
-    - dependency management
-    - risikomanagement
-    - budgetverantwortung
-    - budgetplanung
-    - kostenkontrolle
-    - abhaengigkeitsmanagement
+    ghg_accounting:
+    - ghg protocol
+    - greenhouse gas
+    - carbon accounting
+    - carbon footprint
+    - emissions accounting
+    - emission factors
+    - scope 3
+    - life cycle assessment
+    - thg-bilanzierung
+    - treibhausgasbilanz
+    - co2-bilanzierung
+    - co2-fussabdruck
+    - co2-fußabdruck
+    - emissionsfaktoren
+    - ökobilanz
+    - oekobilanz
+    esg_reporting:
+    - esg reporting
+    - sustainability reporting
+    - csrd
+    - esrs
+    - non-financial reporting
+    - disclosure requirements
+    - nachhaltigkeitsberichterstattung
+    - nachhaltigkeitsbericht
+    - nichtfinanzielle berichterstattung
+    - offenlegungspflichten
+    - offenlegungsanforderungen
+    sustainable_finance:
+    - sustainable finance
+    - eu taxonomy
+    - sfdr
+    - net zero asset owner
+    - transition alignment
+    - climate risk
+    - esg rating
+    - esg-bewertung
+    - eu-taxonomie
+    - nachhaltige finanzen
+    - klimarisiko
+    - transitionsrisiko
+    data_methodology:
+    - data quality
+    - data validation
+    - data analysis
+    - methodology development
+    - input-output
+    - datenqualität
+    - datenvalidierung
+    - datenanalyse
+    - methodenentwicklung
+    - methodikdokumentation
+    assurance:
+    - assurance
+    - external audit
+    - audit trail
+    - isae 3000
+    - limited assurance
+    - prüfungsnachweise
+    - externe prüfung
+    - wirtschaftsprüfer
     stakeholders:
     - stakeholder management
-    - stakeholder coordination
-    - cross-functional coordination
-    - cross functional teams
+    - stakeholder engagement
+    - cross-functional
+    - client presentation
+    - interdisciplinary teams
     - stakeholdermanagement
-    - bereichsuebergreifende koordination
-    - interdisziplinaere teams
-    transformation:
-    - transformation implementation
-    - transformation delivery
-    - change management
-    - organisational transformation
-    - organizational transformation
-    - process improvement
-    - process optimisation
-    - process optimization
-    - organisationsentwicklung
-    - veraenderungsmanagement
-    - prozessoptimierung
-    - transformationsprojekte
+    - stakeholdereinbindung
+    - bereichsübergreifend
+    - interdisziplinäre teams
+    - kundenpräsentation
