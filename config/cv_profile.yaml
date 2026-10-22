@@ -64,6 +64,28 @@ title_must_not_match:
 - working student
 - ausbildung
 - azubi
+# Too senior (keep junior and mid-level only)
+- senior
+- sr.
+- principal
+- head of
+- director
+- direktor
+- vice president
+- vp 
+- chief
+- c-level
+- team lead
+- lead 
+- leiter
+- leitung
+- abteilungsleiter
+- bereichsleiter
+- geschäftsführer
+- geschaeftsfuehrer
+- partner
+- staff
+- expert lead
 # Wrong "Klima" / "Umwelt" meaning (building services, trades)
 - klimatechnik
 - klimaanlage
