@@ -1,8 +1,8 @@
 name: Daily job scrape
 on:
   schedule:
-    - cron: "0 4 * * *"
-    - cron: "0 13 * * *"
+    - cron: "0 0 * * *"
+    - cron: "0 12 * * *"
   workflow_dispatch: {}
   push:
     branches: [main]
