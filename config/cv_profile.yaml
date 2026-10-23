@@ -1,8 +1,5 @@
-# Profile: GHG-Reporting & ESG data specialist (M.Sc. Sustainable Resource Management)
-# Matching is assumed to be case-insensitive substring matching, like the original file.
-
+# Sustainability / ESG / GHG reporting profile. LCA-focused vacancies excluded.
 title_must_match:
-# --- Sustainability / ESG (EN) ---
 - sustainability
 - esg
 - csrd
@@ -16,11 +13,9 @@ title_must_match:
 - decarbonization
 - decarbonisation
 - environmental
-- life cycle assessment
 - sustainable finance
 - impact analyst
 - impact manager
-# --- Sustainability / ESG (DE) ---
 - nachhaltigkeit
 - klimaschutz
 - klimamanager
@@ -34,15 +29,11 @@ title_must_match:
 - umweltwissenschaft
 - umweltanalyst
 - umweltreferent
-- ökobilanz
-- oekobilanz
-- lebenszyklusanalyse
 - nachhaltige finanz
 - referent nachhaltigkeit
 - nachhaltigkeitsreferent
 - nachhaltigkeitsberater
 - nachhaltigkeitsmanager
-# --- Adjacent: data / reporting with a sustainability angle ---
 - data analyst
 - datenanalyst
 - reporting analyst
@@ -53,18 +44,15 @@ title_must_match:
 - carbon accountant
 - climate risk
 - klimarisiko
-
 title_must_not_match:
-# Not the right level / type of role
 - werkstudent
 - praktikum
 - praktikant
 - internship
-- intern 
+- intern
 - working student
 - ausbildung
 - azubi
-# Too senior (keep junior and mid-level only)
 - senior
 - sr.
 - principal
@@ -72,11 +60,11 @@ title_must_not_match:
 - director
 - direktor
 - vice president
-- vp 
+- vp
 - chief
 - c-level
 - team lead
-- lead 
+- lead
 - leiter
 - leitung
 - abteilungsleiter
@@ -86,7 +74,6 @@ title_must_not_match:
 - partner
 - staff
 - expert lead
-# Wrong "Klima" / "Umwelt" meaning (building services, trades)
 - klimatechnik
 - klimaanlage
 - kältetechnik
@@ -101,19 +88,31 @@ title_must_not_match:
 - monteur
 - servicetechniker
 - umweltschutztechnischer assistent
-# Sales / unrelated
 - vertrieb
 - sales
 - account executive
 - außendienst
 - aussendienst
 - fahrer
-
+- lca
+- life cycle assessment
+- life-cycle assessment
+- lifecycle assessment
+- life cycle analysis
+- life-cycle analysis
+- life cycle analyst
+- life cycle specialist
+- life cycle expert
+- life cycle engineer
+- life cycle manager
+- life cycle consultant
+- oekobilanz
+- ökobilanz
+- lebenszyklusanalyse
+- openlca
 main_min_score: 3
 score_ceiling: 20
-
 scoring_keywords:
-# --- Core: GHG / carbon accounting (weight 5) ---
 - term: GHG
   weight: 5
 - term: greenhouse gas
@@ -146,7 +145,6 @@ scoring_keywords:
   weight: 3
 - term: Emissionen
   weight: 3
-# --- Core: ESG / CSRD reporting (weight 5) ---
 - term: ESG
   weight: 5
 - term: CSRD
@@ -187,7 +185,6 @@ scoring_keywords:
   weight: 3
 - term: Dekarbonisierung
   weight: 3
-# --- Assurance / methodology (weight 3-4) ---
 - term: ISAE 3000
   weight: 4
 - term: assurance
@@ -204,7 +201,6 @@ scoring_keywords:
   weight: 3
 - term: Methodenentwicklung
   weight: 3
-# --- Models / data sources / tools (weight 2-4) ---
 - term: input-output
   weight: 4
 - term: Input-Output-Modell
@@ -212,16 +208,6 @@ scoring_keywords:
 - term: EXIOBASE
   weight: 4
 - term: EORA
-  weight: 3
-- term: life cycle assessment
-  weight: 4
-- term: LCA
-  weight: 3
-- term: Ökobilanz
-  weight: 4
-- term: Lebenszyklusanalyse
-  weight: 4
-- term: OpenLCA
   weight: 3
 - term: MSCI
   weight: 2
@@ -257,7 +243,6 @@ scoring_keywords:
   weight: 1
 - term: Fernerkundung
   weight: 1
-# --- Regulatory / risk / sector (weight 2-3) ---
 - term: regulatory compliance
   weight: 3
 - term: compliance
@@ -308,7 +293,6 @@ scoring_keywords:
   weight: 1
 - term: Politik
   weight: 1
-# --- Working style / soft skills (weight 1-2) ---
 - term: stakeholder
   weight: 2
 - term: stakeholder management
@@ -349,10 +333,6 @@ scoring_keywords:
   weight: 1
 - term: Qualitätsmanagement
   weight: 1
-
-# Set enabled to false to disable the related-role trial.
-# Idea: catch generic analyst / consultant / specialist titles whose body text
-# shows sustainability-data or reporting responsibilities.
 related_roles:
   enabled: true
   min_responsibility_groups: 2
@@ -381,15 +361,12 @@ related_roles:
     - emissions accounting
     - emission factors
     - scope 3
-    - life cycle assessment
     - thg-bilanzierung
     - treibhausgasbilanz
     - co2-bilanzierung
     - co2-fussabdruck
     - co2-fußabdruck
     - emissionsfaktoren
-    - ökobilanz
-    - oekobilanz
     esg_reporting:
     - esg reporting
     - sustainability reporting
@@ -446,3 +423,8 @@ related_roles:
     - bereichsübergreifend
     - interdisziplinäre teams
     - kundenpräsentation
+excluded_focus_title_patterns:
+- \blca\b
+- \blife[\s-]*cycle[\s-]+(?:assessment|analysis|analyst|specialist|expert|engineer|manager|consultant)\b
+- \b(?:oeko|öko)bilanz\w*
+- \blebenszyklus(?:analyse|bewertung)\w*
