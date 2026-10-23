@@ -292,7 +292,7 @@ def json_records(data,url,collection=False,depth=0):
                                 description=plain(data.get('description') or data.get('jobDescription') or ''),posted_date=date,_date_raw=date,_date_field=date_field or 'none',_date_kind='publication',_date_source=url,_extraction='public_embedded_jobs'))
         for key,value in data.items():
             if isinstance(value,(dict,list)):
-                out.extend(json_records(value,url,str(key).lower() in ('jobs','positions','jobpostings','joblist','joboffers'),depth+1))
+                out.extend(json_records(value,url,str(key).lower() in ('jobs','positions','jobpostings','joblist','joboffers','requisitions') or (collection and str(key).lower() in ('data','items','results','content')),depth+1))
     return dedupe(out)
 
 
@@ -468,7 +468,6 @@ def _browse_public_board(name,url,seconds=BROWSER_SECONDS):
                     try:
                         parsed=urlparse(resp.url)
                         if parsed.hostname!=urlparse(url).hostname:return
-                        if not re.search(r'/api/apply/v2/jobs(?:/|$)|/widgets(?:/|$)|/jobs/search(?:/|$)',parsed.path):return
                         if resp.status!=200 or 'json' not in resp.headers.get('content-type',''):return
                         network_jobs.extend(json_records(resp.json(),url));checkpoint(network_jobs)
                     except Exception:
@@ -541,17 +540,27 @@ def _browse_public_board(name,url,seconds=BROWSER_SECONDS):
 
 
 def browse_public_board(name, url, seconds=BROWSER_SECONDS):
-    """Charge all paginated browser recovery to the shared browser budget."""
     global _headless_time_used
-    seconds = min(seconds, headless_budget_remaining())
-    if seconds <= 0:
-        logger.warning('Browser budget exhausted; coverage unverified for %s', name)
-        return [], {'pages': 0, 'completion': 'browser_budget_exhausted', 'unique_candidates': 0}
-    started = time.monotonic()
+    from src.extraction import canonical_job_url
+    key=canonical_job_url(url)
+    if key in _BROWSER_CACHE:
+        jobs,stats=_BROWSER_CACHE[key]
+        return [dict(j) for j in jobs],dict(stats)
+    allowance=max(0.0,25.0-_BROWSER_BY_SOURCE.get(name,0.0))
+    seconds=min(seconds,headless_budget_remaining(),allowance)
+    if seconds<=0:
+        reason='browser_budget_exhausted' if headless_budget_remaining()<=0 else 'employer_browser_budget_exhausted'
+        logger.warning('%s; coverage unverified for %s',reason,name)
+        return [],dict(pages=0,completion=reason,unique_candidates=0)
+    started=time.monotonic()
     try:
-        return _browse_public_board(name, url, seconds=seconds)
+        result=_browse_public_board(name,url,seconds=seconds)
+        _BROWSER_CACHE[key]=([dict(j) for j in result[0]],dict(result[1]))
+        return result
     finally:
-        _headless_time_used += time.monotonic() - started
+        elapsed=time.monotonic()-started
+        _headless_time_used+=elapsed
+        _BROWSER_BY_SOURCE[name]=_BROWSER_BY_SOURCE.get(name,0.0)+elapsed
 
 def scrape_eightfold(name,url,domain,get,max_pages=500,seconds=SOURCE_SECONDS):
     """Public Eightfold route; runtime response schema and coverage remain checked.
@@ -1062,7 +1071,7 @@ def scrape_workday(company_name: str, careers_url: str) -> list[dict[str, Any]]:
     repeated_recovery=False
     source_started=time.monotonic()
     for _ in range(500):
-        if time.monotonic()-source_started>=120:
+        if time.monotonic()-source_started>=90:
             completion='time_limit';logger.warning('Workday incomplete pagination: time limit; retaining %s candidates',len(jobs));break
         try:
             resp = requests.post(api_url, json={"limit": request_limit, "offset": offset, "searchText": "", "appliedFacets": {}}, headers=HEADERS, timeout=request_timeout(TIMEOUT))
@@ -1095,7 +1104,7 @@ def scrape_workday(company_name: str, careers_url: str) -> list[dict[str, Any]]:
             stamp_date(jobs[-1],posting.get("postedOn", ""),"postedOn")
         checkpoint(jobs)
         if not added:
-            if advertised_total is not None and len(jobs) >= advertised_total:
+            if advertised_total is not None and advertised_total > 0 and len(jobs) >= advertised_total:
                 completion = 'reported_total_reached'
             elif not repeated_recovery and offset>0 and len(page)!=request_limit:
                 request_limit=len(page);repeated_recovery=True
@@ -1202,7 +1211,9 @@ def scrape_generic(company_name, careers_url):
 # spent, remaining companies just keep whatever scrape_generic already
 # found — same as before this feature existed, not worse.
 # --------------------------------------------------------------------------
-_HEADLESS_BUDGET_SECONDS = 900  # 15 minutes reserved for the whole run
+_HEADLESS_BUDGET_SECONDS = 3600  # Shared cap, plus fair per-employer allowance.
+_BROWSER_CACHE = {}
+_BROWSER_BY_SOURCE = {}
 _headless_time_used = 0.0
 GENERIC_RESULT_SUSPICIOUSLY_LOW = 5  # fewer real-looking links than this -> probably a JS shell, worth a retry
 
@@ -1213,6 +1224,8 @@ def reset_headless_budget() -> None:
     _headless_time_used = 0.0
     _GET_CACHE.clear()
     _HTTP_STATUS.clear()
+    _BROWSER_CACHE.clear()
+    _BROWSER_BY_SOURCE.clear()
 
 
 def headless_budget_remaining() -> float:
@@ -1339,6 +1352,13 @@ def platform_from_url(url):
     if _WORKDAY_URL_RE.search(url):return url, 'workday', None
     return None, None, None
 
+def is_vacancy_detail_link(url):
+    p=urlparse(url)
+    parts=p.path.strip('/').split('/')
+    if p.hostname in ('jobs.lever.co','jobs.ashbyhq.com') and len(parts)>1:return True
+    if p.hostname and p.hostname.endswith('.greenhouse.io') and len(parts)>1 and parts[0]!='embed':return True
+    return bool(re.search(r'/(?:jobs?|positions?|postings?|o)/[^/]+',p.path,re.I) and not re.search(r'/(?:search|results|all)/?$',p.path,re.I))
+
 def discover_real_careers_url(vanity_url):
     resp = _safe_get(vanity_url, allow_redirects=True)
     if resp is None:return None, None, None
@@ -1351,12 +1371,17 @@ def discover_real_careers_url(vanity_url):
     candidates=[c for c in candidates if urlparse(c).scheme in ('http','https') and not urlparse(c).path.lower().endswith(('.pdf','.png','.jpg','.js','.css')) and not any(x in urlparse(c).path.lower() for x in ('privacy','datenschutz','legal'))]
     for candidate in candidates:
         found = platform_from_url(candidate)
-        if found[0]:return found
+        if found[0] and not is_vacancy_detail_link(candidate):return found
+    for anchor in soup.find_all('a',href=True):
+        label=clean_label(anchor.get_text(' ',strip=True))
+        if re.fullmatch(r'(?:search jobs|find jobs|view all jobs|all jobs|job search|open positions|current vacancies|stellenangebote|offene stellen|stellen suchen|stellensuche|jobboerse)',label,re.I):
+            candidate=urljoin(resp.url,anchor['href'])
+            if urlparse(candidate).scheme=='https' and candidate.rstrip('/')!=vanity_url.rstrip('/') and not is_vacancy_detail_link(candidate):return candidate,None,None
     for candidate in candidates:
         path = urlparse(candidate).path.lower()
         if candidate.rstrip('/') == vanity_url.rstrip('/'):continue
         if path.endswith(('.pdf','.png','.jpg','.js','.css')) or any(x in path for x in ('privacy','datenschutz','legal')):continue
-        if _GENERIC_JOB_BOARD_HINT.search(candidate):return candidate, None, None
+        if _GENERIC_JOB_BOARD_HINT.search(candidate) and not is_vacancy_detail_link(candidate):return candidate, None, None
     return None, None, None
 
 
@@ -1380,8 +1405,6 @@ def _recover_thin_result(company_name: str, careers_url: str, current_result: li
     """
     from src.extraction import usable_title
     usable = sum(usable_title(j.get('title','')) and not j.get('_needs_title') for j in current_result)
-    if usable >= GENERIC_RESULT_SUSPICIOUSLY_LOW:
-        return current_result
 
     best_result = current_result
     best_url = careers_url
@@ -1405,7 +1428,7 @@ def _recover_thin_result(company_name: str, careers_url: str, current_result: li
         # correct URL) is trustworthy even if it happens to return
         # fewer raw entries than whatever junk the thin result had.
         if candidate:
-            best_result = candidate
+            best_result = dedupe(current_result+candidate)
 
     if sum(usable_title(j.get('title','')) and not j.get('_needs_title') for j in best_result) >= GENERIC_RESULT_SUSPICIOUSLY_LOW:
         return best_result
@@ -1417,7 +1440,6 @@ def _recover_thin_result(company_name: str, careers_url: str, current_result: li
         logger.warning('Access/rate limit for %s; no browser retry against the same URL',company_name)
         return best_result
     headless_result = scrape_html_board(company_name, best_url, _safe_get)
-    from src.extraction import dedupe
     return dedupe(best_result + headless_result)
 
 
@@ -1470,7 +1492,7 @@ def scrape_company(company: dict[str, Any]) -> list[dict[str, Any]]:
             return scrape_priority_board(name,careers_url,_safe_get)
         if ats == "public_board":
 
-            return scrape_html_board(name, careers_url, _safe_get)
+            return _recover_thin_result(name,careers_url,scrape_html_board(name, careers_url, _safe_get))
         if ats == "eightfold":
 
             return scrape_eightfold(name, careers_url, token, _safe_get)
@@ -1541,10 +1563,12 @@ def fetch_job_details(url):
             return {}, ''
         desc = plain(info.get('jobDescription'))
         places = []
-        for value in [info.get('location')] + list(info.get('additionalLocations') or []):
+        additional=info.get('additionalLocations') or []
+        if not isinstance(additional,list):additional=[additional]
+        for value in [info.get('location')] + additional:
             if isinstance(value, str) and value.strip():places.append(value.strip())
             elif isinstance(value, dict):
-                text = value.get('location') or value.get('name')
+                text = value.get('location') or value.get('name') or value.get('descriptor')
                 if isinstance(text, str) and text.strip():places.append(text.strip())
         details = dict(title=plain(info.get('title')), description=desc,
                        location='; '.join(dict.fromkeys(places)),
@@ -1561,12 +1585,13 @@ def fetch_job_details(url):
         desc = ' '.join(plain(section.get('text','')) for section in sections.values() if isinstance(section,dict))
         loc = data.get('location') or {}
         return {'description': desc, 'location': ', '.join(str(loc[k]) for k in ('city','country') if loc.get(k)), 'posted_date': normalize_fresh_posted(data.get('releasedDate','')),'_date_raw':data.get('releasedDate',''),'_date_field':'releasedDate','_date_kind':'publication','_date_source':url}, desc
-    jobs = structured_jobs(resp.text, resp.url or url)
-    # Only trust one identifiable vacancy, not a board containing many jobs.
-    details = jobs[0] if len(jobs) == 1 else {}
-    if not jobs:
-        recovered = detail_title(resp.text)
-        if recovered:details = {'title': recovered}
+    from src.extraction import canonical_job_url
+    jobs=dedupe(structured_jobs(resp.text,resp.url or url)+embedded_jobs(resp.text,resp.url or url))
+    targets={canonical_job_url(url),canonical_job_url(resp.url or url)}
+    matching=[j for j in jobs if canonical_job_url(j.get('url','')) in targets]
+    details=dict(matching[0]) if len(matching)==1 else {}
+    recovered=detail_title(resp.text)
+    if recovered and not details.get('title'):details['title']=recovered
     soup = BeautifulSoup(resp.text, 'html.parser')
     if not details.get('location'):
         location_tag = soup.select_one('[itemprop="jobLocation"],.job-location,.jobLocation,.job-location-label,[data-ph-at-id="job-location"],[data-testid="job-location"]')
@@ -1574,10 +1599,11 @@ def fetch_job_details(url):
             details['location'] = location_tag.get('content') or location_tag.get_text(' ', strip=True)
             details['_location_source']='detail_explicit_location'
         else:
-            for label in soup.select('dt,th'):
+            for label in soup.select('main dt,main th,main label,main span,main div,article dt,article th,dt,th'):
                 if label.get_text(' ', strip=True).lower().rstrip(':') in ('standort','standorte','location','locations','arbeitsort'):
-                    value = label.find_next_sibling(['dd','td'])
-                    if value:details['location'] = value.get_text(' ', strip=True);break
+                    value = label.find_next_sibling(['dd','td','span','div'])
+                    if value and 0<len(value.get_text(' ',strip=True))<=250 and not value.find(['form','h1','h2','button']):
+                        details['location']=value.get_text(' ',strip=True);details['_location_source']='detail_explicit_location';break
     if not details.get('location'):
 
         explicit=priority_detail_location(resp.text,resp.url or url)

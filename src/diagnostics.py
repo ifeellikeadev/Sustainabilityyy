@@ -26,7 +26,7 @@ class SourceBudget:
         from src.extraction import dedupe
         self.candidates=dedupe(self.candidates+list(jobs))
         return jobs
-    def call(self,fn,*args,default=None,phase='operation',**kwargs):
+    def call(self,fn,*args,default=None,phase='operation',max_seconds=None,**kwargs):
         self.phase=phase
         if self.remaining()<=0:
             self.expired=True
@@ -45,7 +45,7 @@ class SourceBudget:
             signal.setitimer(signal.ITIMER_REAL,2.0)
             raise SourceDeadline()
         signal.signal(signal.SIGALRM,timeout)
-        signal.setitimer(signal.ITIMER_REAL,max(.001,self.remaining()))
+        signal.setitimer(signal.ITIMER_REAL,max(.001,min(self.remaining(),float(max_seconds)) if max_seconds is not None else self.remaining()))
         try:return fn(*args,**kwargs)
         except SourceDeadline:
             logger.warning('Source runtime budget exhausted during %s; retaining %s checkpointed candidates',phase,len(self.candidates))
@@ -53,9 +53,12 @@ class SourceBudget:
         finally:
             signal.setitimer(signal.ITIMER_REAL,0)
             signal.signal(signal.SIGALRM,old_handler)
+    def renew_detail_phase(self):
+        self.listing_expired = self.expired
+        self.expired = self.remaining() <= 0
     def diagnostics(self):
         return dict(limit_seconds=self.seconds,elapsed_seconds=round(time.monotonic()-self.started,2),
-                    expired=self.expired,alarm_enforced=self.enforced,detail_requests_skipped=self.detail_skipped,
+                    expired=self.expired,listing_expired=getattr(self,'listing_expired',False),alarm_enforced=self.enforced,detail_requests_skipped=self.detail_skipped,
                     checkpointed_candidates=len(self.candidates),last_phase=self.phase)
 @contextmanager
 def source_budget(seconds=DEFAULT_SOURCE_SECONDS):
@@ -119,7 +122,7 @@ def finish(row,error=None):
     elif row['raw_candidates'] and row.get('title_unresolved',0)>=row['raw_candidates']:row['status']='EXTRACTION_INCOMPLETE'
     elif row['issues']:row['status']='PARTIAL_OR_WARNING' if row['raw_candidates'] else 'FAILED_OR_BLOCKED'
     elif not row['raw_candidates']:row['status']='EMPTY_UNVERIFIED'
-    elif row.get('title_unresolved',0) or row.get('location_unconfirmed',0):row['status']='PARTIAL_OR_WARNING'
+    elif row.get('title_unresolved',0) or row.get('location_unconfirmed',0) or row.get('matching_unresolved',0):row['status']='PARTIAL_OR_WARNING'
     elif row['eligible']:row['status']='MATCHES_FOUND'
     else:row['status']='NO_MATCHES_IN_EXTRACTED_RESULTS'
     text=' '.join(row['issues']).lower()
@@ -162,7 +165,7 @@ def append_to_page(rows,path):
             details += '<br>Pagination: ' + html.escape(json.dumps(row['pagination']))
         if row.get('unresolved_samples'):
             details += '<br>Unresolved examples: ' + html.escape(json.dumps(row['unresolved_samples'],ensure_ascii=False))
-        for key in ('date_decisions','date_rejected_samples','date_kept_samples','location_rejected_samples','title_rejection_details','score_rejected_samples'):
+        for key in ('date_decisions','date_rejected_samples','date_kept_samples','location_rejected_samples','title_rejection_details','score_rejected_samples','location_unconfirmed_samples'):
             if row.get(key):details += '<br>'+html.escape(key.replace('_',' ').title())+': '+html.escape(json.dumps(row[key],ensure_ascii=False))
         samples=html.escape('; '.join(row.get('title_rejected_samples',[])))
         details += '<br>Rejected-title examples: '+samples if samples else ''

@@ -54,7 +54,7 @@ def _render_table(
     if ws is None or ws.max_row < 2:
         return f"<tr><td colspan='{len([c for c in columns if c != 'URL']) + 1}'>{_escape(empty_message)}</td></tr>", 0
 
-    from src.matching import excluded_title_term
+    from src.matching import excluded_title_term, excluded_focus
     profile = yaml.safe_load(CV_PROFILE_FILE.read_text(encoding="utf-8")) if CV_PROFILE_FILE.exists() else {}
     url_col = columns.index("URL") + 1
     title_col = columns.index("Job Title")
@@ -66,7 +66,7 @@ def _render_table(
         if all(v is None for v in values):
             continue  # skip fully-empty rows
         record = dict(zip(columns, values))
-        if excluded_title_term(record.get('Job Title'), (profile or {}).get('title_must_not_match', [])) or not allowed_job({'city':record.get('City'), 'company':record.get('Company'), 'url':record.get('URL'), 'location':record.get('Location')}):
+        if excluded_focus(record.get('Job Title'), profile or {}) or excluded_title_term(record.get('Job Title'), (profile or {}).get('title_must_not_match', [])) or not allowed_job({'city':record.get('City'), 'company':record.get('Company'), 'url':record.get('URL'), 'location':record.get('Location')}):
             continue
         is_highlighted = _rgb_matches(ws.cell(row=row, column=1), new_row_fill)
         url = str(values[url_col - 1] or "#")
@@ -112,7 +112,7 @@ def _section_html(title: str, columns: list[str], rows_html: str, total: int, le
 
 def _records(ws):
     """Presentation only: preserve the installed scope/seniority guards and ordering."""
-    from src.matching import parse_posted, keep_posted, excluded_title_term
+    from src.matching import parse_posted, keep_posted, excluded_title_term, excluded_focus
     if ws is None:return []
     records=[]
     profile=yaml.safe_load(CV_PROFILE_FILE.read_text(encoding="utf-8")) if CV_PROFILE_FILE.exists() else {}
@@ -120,7 +120,7 @@ def _records(ws):
     for row in range(2,ws.max_row+1):
         record={col:ws.cell(row,i+1).value for i,col in enumerate(COLUMNS)}
         if all(v is None for v in record.values()):continue
-        if excluded_title_term(record.get('Job Title'), (profile or {}).get('title_must_not_match', [])) or not allowed_job({'city':record.get('City'),'company':record.get('Company'),'url':record.get('URL'),'location':record.get('Location')}):continue
+        if excluded_focus(record.get('Job Title'), profile or {}) or excluded_title_term(record.get('Job Title'), (profile or {}).get('title_must_not_match', [])) or not allowed_job({'city':record.get('City'),'company':record.get('Company'),'url':record.get('URL'),'location':record.get('Location')}):continue
         if record.get('Match Type')=='Related role' and not related_enabled:continue
         raw=record.get('Job Posted');posted=parse_posted(raw)
         if not keep_posted(raw):continue

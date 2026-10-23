@@ -25,6 +25,8 @@ def location(value):
     if isinstance(value,str):return value
     if not isinstance(value,dict):return ''
     address=value.get('address',value)
+    if isinstance(address,dict) and not any(k in address for k in ('addressLocality','addressRegion','addressCountry')):
+        return ', '.join(str(address[k]) for k in ('city','state','country') if isinstance(address.get(k),str)) or (address.get('name','') if isinstance(address.get('name'),str) else '')
     if isinstance(address,str):return address
     if not isinstance(address,dict):return ''
     return ', '.join(str(address[k]) for k in ('addressLocality','addressRegion','addressCountry') if isinstance(address.get(k),str))
@@ -151,10 +153,10 @@ def html_jobs(html,url):
                 if parent.name in ('body','html','main'):break
                 links={link.get('href') for link in parent.select('a[href]') if DETAIL.search(urlparse(resolve_job_url(base,link.get('href',''))).path)}
                 if len(links)>1:break
-                if parent.select_one('[itemprop="jobLocation"],.job-location,.position-location,[data-testid="job-location"],[data-ph-at-id="job-location"]'):
+                if parent.select_one('[itemprop="jobLocation"],.job-location,.position-location,.jobLocation,.location,[data-testid="job-location"],[data-ph-at-id="job-location"]'):
                     card=parent;break
         if card is not None:
-            tag=card.select_one('[itemprop="jobLocation"],.job-location,.position-location,[data-testid="job-location"],[data-ph-at-id="job-location"]')
+            tag=card.select_one('[itemprop="jobLocation"],.job-location,.position-location,.jobLocation,.location,[data-testid="job-location"],[data-ph-at-id="job-location"]')
             if tag:loc=tag.get_text(' ',strip=True)
         jobs.append(dict(title=title,location=loc,url=target,description='',posted_date='',_extraction=method))
     return dedupe(structured+jobs)

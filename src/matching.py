@@ -350,7 +350,7 @@ def _responsibility_text(value):
     text = html.unescape(str(value or '')).casefold()
     text = text.replace('ä','ae').replace('ö','oe').replace('ü','ue').replace('ß','ss')
     text = unicodedata.normalize('NFKC', text)
-    return re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', text)).strip()
+    return re.sub(r'\s+', ' ', re.sub(r'[\-\u2010-\u2015_]', ' ', re.sub(r'<[^>]+>', ' ', text))).strip()
 
 def related_role_candidate(title, profile):
     settings = profile.get('related_roles') or {}
@@ -362,7 +362,13 @@ def related_role_candidate(title, profile):
     text = normalized_title(title)
     return any(re.search(pattern, text, re.I) for pattern in settings.get('candidate_title_patterns', []))
 
+def excluded_focus(title, profile):
+    return any(re.search(pattern, normalized_title(title), re.I)
+               for pattern in profile.get('excluded_focus_title_patterns', []))
+
 def role_decision(job, profile):
+    if excluded_focus(job.get('title',''), profile):
+        return dict(keep=False,reason='excluded_job_focus',term='LCA-focused title',match_type='',match_reason='',groups=[])
     direct = title_decision(job.get('title',''), profile.get('title_must_match', []), profile.get('title_must_not_match', []))
     if direct['keep']:
         return dict(direct, match_type='Direct role', match_reason='Title: '+direct['term'], groups=[])

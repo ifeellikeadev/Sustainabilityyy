@@ -12,7 +12,7 @@ import yaml
 sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 from src.scrapers import scrape_company, fetch_job_details, reset_headless_budget
 from src.diagnostics import source_budget
-from src.matching import title_decision, location_decision, score_jobs, related_role_candidate, role_decision
+from src.matching import title_decision, location_decision, score_jobs, related_role_candidate, role_decision, excluded_focus
 from src.matching import filter_recent_jobs, parse_posted, date_decision
 from src.extraction import usable_title, dedupe, is_vacancy_url
 from src.tracker import update_tracker
@@ -38,7 +38,7 @@ def excluded(company):
 
 def enrich(job,details):
     for field in ('location','description'):
-        if details.get(field) and (not job.get(field) or (field=='location' and location_decision(job)['status']=='unconfirmed')):
+        if details.get(field) and (not job.get(field) or (field=='location' and (location_decision(job)['status']=='unconfirmed' or details.get('_location_source')=='workday_jobPostingInfo'))):
             job[field]=details[field]
             if field=='location':job['_location_source']=details.get('_location_source','detail_explicit_location')
     if details.get('posted_date') and (not job.get('posted_date') or job.get('_date_kind')=='creation_unverified'):
@@ -79,17 +79,18 @@ def scrape_all_any_city(companies,cv_profile):
         row.update(location_unconfirmed=0,non_job_links_removed=0,duplicate_candidates_removed=0,date_decisions={},date_rejected_samples=[],date_kept_samples=[],location_rejected_samples=[],title_rejection_details=[])
         try:
             with source_budget() as budget, observe(row):
-                extracted=budget.call(scrape_company,company,default=None,phase='listing')
+                extracted=budget.call(scrape_company,company,default=None,phase='listing',max_seconds=105)
+                budget.renew_detail_phase()
                 if extracted is None:extracted=budget.candidates
                 budget.remember(extracted)
                 valid=[j for j in extracted if is_vacancy_url(j.get('url',''))]
                 row['non_job_links_removed']=len(extracted)-len(valid)
                 raw=dedupe(valid);row['duplicate_candidates_removed']=len(valid)-len(raw);row['raw_candidates']=len(raw)
                 row['pagination']=next((j['_pagination'] for j in raw if j.get('_pagination')), {})
-                row['title_recovered']=0;row['title_unresolved']=0;recovery_budget=60
+                row['title_recovered']=0;row['title_unresolved']=0;recovery_budget=60;recovery_started=time.monotonic()
                 for candidate in raw:
                     if usable_title(candidate.get('title','')) and not candidate.get('_needs_title'):continue
-                    if recovery_budget<=0:row['title_unresolved']+=1;continue
+                    if recovery_budget<=0 or time.monotonic()-recovery_started>=15 or budget.remaining()<=45:row['title_unresolved']+=1;continue
                     recovery_budget-=1
                     details,_=cached_details(candidate.get('_detail_api_url') or candidate.get('url',''),row)
                     if usable_title(details.get('title','')):
@@ -105,32 +106,30 @@ def scrape_all_any_city(companies,cv_profile):
                     else:row['date_rejected']+=1
                 readable=[j for j in recent if usable_title(j.get('title','')) and not j.get('_needs_title')]
                 row['extraction_unresolved']=len(recent)-len(readable)
-                titled=[]
+                confirmed=[]
+                row['matching_unresolved']=0;row['location_unconfirmed_samples']=[]
                 readable.sort(key=lambda j: (not title_decision(j['title'], cv_profile.get('title_must_match', []), cv_profile.get('title_must_not_match', []))['keep'], location_decision(j)['status'] != 'confirmed'))
                 for job in readable:
-                    if related_role_candidate(job['title'],cv_profile) and location_decision(job)['status'] not in ('outside','excluded') and not job.get('description'):
-                        details,body=cached_details(job.get('_detail_api_url') or job.get('url',''),row)
-                        enrich(job,details)
-                        if not job.get('description') and body:job['description']=body
-                        row['related_detail_fetch_attempts']=row.get('related_detail_fetch_attempts',0)+1
+                    direct=title_decision(job['title'],cv_profile.get('title_must_match',[]),cv_profile.get('title_must_not_match',[]))
+                    possible_related=related_role_candidate(job['title'],cv_profile)
+                    if not excluded_focus(job['title'],cv_profile) and (direct['keep'] or possible_related):
+                        loc_before=location_decision(job)
+                        if (loc_before['status'] not in ('outside','excluded') or job.get('_extraction')=='workday_api') and (not job.get('description') or loc_before['status']=='unconfirmed'):
+                            details,body=cached_details(job.get('_detail_api_url') or job.get('url',''),row)
+                            enrich(job,details)
+                            if not job.get('description') and body:job['description']=body
+                            if possible_related:row['related_detail_fetch_attempts']=row.get('related_detail_fetch_attempts',0)+1
                     decision=role_decision(job,cv_profile)
-                    if decision['keep']:
-                        job['match_type']=decision['match_type'];job['match_reason']=decision['match_reason']
-                        if decision['match_type']=='Related role':row['related_roles_qualified']=row.get('related_roles_qualified',0)+1
-                    if decision['keep']:titled.append(job)
-                    else:
-                        row['title_rejected']+=1
+                    if not decision['keep']:
+                        if decision['reason']=='related_description_missing':
+                            row['matching_unresolved']+=1;row['extraction_unresolved']+=1
+                        else:row['title_rejected']+=1
                         if len(row['title_rejection_details'])<20:row['title_rejection_details'].append({'title':job['title'],'url':job['url'],**decision})
-                row['title_rejected_samples']=[j['title'] for j in row['title_rejection_details'][:8]]
-                counts['title_matched']+=len(titled);confirmed=[]
-                for job in titled:
-                    loc_before=location_decision(job)
-                    # Known outside/excluded locations do not need expensive details.
-                    if loc_before['status'] not in ('outside','excluded') and job.get('url') and (loc_before['status']=='unconfirmed' or not job.get('description') or not job.get('posted_date')):
-                        details,body=cached_details(job.get('_detail_api_url') or job['url'],row);enrich(job,details)
-                        if not job.get('description') and body:job['description']=body
-                    decision=audit_date(row,job,'after_detail')
-                    if not decision['keep']:row['date_rejected']+=1;continue
+                        continue
+                    job['match_type']=decision['match_type'];job['match_reason']=decision['match_reason']
+                    if decision['match_type']=='Related role':row['related_roles_qualified']=row.get('related_roles_qualified',0)+1
+                    counts['title_matched']+=1
+                    if not audit_date(row,job,'after_detail')['keep']:row['date_rejected']+=1;continue
                     job=filter_recent_jobs([job])[0]
                     loc=location_decision(job)
                     if loc['status'] in ('outside','excluded'):
@@ -139,8 +138,11 @@ def scrape_all_any_city(companies,cv_profile):
                         continue
                     if loc['status']=='unconfirmed':
                         row['location_unconfirmed']+=1
+                        if len(row['location_unconfirmed_samples'])<20:row['location_unconfirmed_samples'].append({'title':job['title'],'url':job['url'],**loc})
                         continue
                     job['company']=company['name'];job['city']='Munich';job.pop('matched_city',None);confirmed.append(job)
+                row['title_rejected_samples']=[j['title'] for j in row['title_rejection_details'][:8]]
+                if row['matching_unresolved']:row['issues'].append('Related-role descriptions unavailable: matching unresolved, not proof of unsuitable vacancies.')
                 counts['location_confirmed']+=len(confirmed);score_jobs(confirmed,cv_profile)
                 floor=cv_profile.get('main_min_score',0);eligible=[j for j in confirmed if j.get('relevance_score',0)>=max(floor,7 if j.get('match_type')=='Related role' else 0)]
                 row['score_rejected']=len(confirmed)-len(eligible);row['eligible']=len(eligible)
@@ -150,7 +152,7 @@ def scrape_all_any_city(companies,cv_profile):
         except Exception as exc:
             error=exc;counts['errored']+=1;logger.exception('FAILED %s',company['name'])
         row['runtime_budget']=budget.diagnostics()
-        if budget.expired:row['issues'].append('Source runtime budget exhausted; coverage incomplete; partial candidates retained and remaining details skipped.')
+        if budget.expired or getattr(budget,'listing_expired',False):row['issues'].append('Source runtime budget exhausted; coverage incomplete; partial candidates retained and remaining details skipped.')
         if not budget.enforced:row['issues'].append('Source deadline enforcement unavailable in this runtime; cooperative checks only.')
         row['seconds']=round(time.monotonic()-start,2);finish(row,error);reports.append(row)
         row['funnel_accounted']=sum(row.get(k,0) for k in ('date_rejected','extraction_unresolved','title_rejected','location_rejected','location_unconfirmed','score_rejected','eligible'))

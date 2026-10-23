@@ -109,7 +109,7 @@ def load_or_create(path: Path, cv_profile=None) -> Workbook:
         return _new_workbook()
 
     wb = load_workbook(path)
-    from src.matching import excluded_title_term
+    from src.matching import excluded_title_term, excluded_focus
     profile = cv_profile or {}
     _ensure_sheet(wb, "Jobs", COLUMNS, COLUMN_WIDTHS, 0)
     # Active workbook is Munich-only; historical archives are not modified.
@@ -119,7 +119,7 @@ def load_or_create(path: Path, cv_profile=None) -> Workbook:
     ws = wb['Jobs']
     for row in range(ws.max_row, 1, -1):
         record = {col: ws.cell(row, i + 1).value for i, col in enumerate(COLUMNS)}
-        if excluded_title_term(record.get('Job Title'), profile.get('title_must_not_match', [])) or not allowed_job({'city':record.get('City'), 'company':record.get('Company'), 'url':record.get('URL'), 'location':record.get('Location')}):
+        if excluded_focus(record.get('Job Title'), profile) or excluded_title_term(record.get('Job Title'), profile.get('title_must_not_match', [])) or not allowed_job({'city':record.get('City'), 'company':record.get('Company'), 'url':record.get('URL'), 'location':record.get('Location')}):
             ws.delete_rows(row)
     return wb
 
@@ -234,9 +234,9 @@ def _build_jobs_row(job: dict[str, Any], url: str) -> list:
 
 
 def update_tracker(path: Path, new_jobs: list[dict[str, Any]], min_score: int = 0, related_roles_enabled: bool = True, cv_profile=None) -> dict[str, int]:
-    from src.matching import excluded_title_term
+    from src.matching import excluded_title_term, excluded_focus
     profile = cv_profile or {}
-    new_jobs = [j for j in new_jobs if not excluded_title_term(j.get("title"), profile.get("title_must_not_match", []))]
+    new_jobs = [j for j in new_jobs if not excluded_focus(j.get("title"), profile) and not excluded_title_term(j.get("title"), profile.get("title_must_not_match", []))]
     wb = load_or_create(path, cv_profile=cv_profile)
     if not related_roles_enabled:
         ws = wb["Jobs"]
