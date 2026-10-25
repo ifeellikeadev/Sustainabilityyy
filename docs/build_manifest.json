@@ -1,7 +1,7 @@
 {
-  "build_id": "40105395654-1",
-  "source_commit": "76c01ac3c23feba5ba4db7e9fae6078db8ea00e7",
-  "generated_at": "2026-10-24T15:56:14.433241+00:00",
-  "index_sha256": "2ac59a6eea79493adf90b9cced6c6368a26bf53b665b9ccdbbe0aee703f1a79a",
+  "build_id": "40154218994-1",
+  "source_commit": "f6b567c1bbcf4d4e6be9d38dd6d1aa4676fa6c0c",
+  "generated_at": "2026-10-25T03:18:50.260267+00:00",
+  "index_sha256": "f75b02b18f5b086f6829822b15023bcbf240211486943e2a1360fb6cb71346c8",
   "coverage_degraded": true
 }
