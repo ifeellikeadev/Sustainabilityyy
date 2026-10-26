@@ -139,6 +139,8 @@ def scrape_all_any_city(companies,cv_profile):
                     if loc['status']=='unconfirmed':
                         row['location_unconfirmed']+=1
                         if len(row['location_unconfirmed_samples'])<20:row['location_unconfirmed_samples'].append({'title':job['title'],'url':job['url'],**loc})
+                         job['match_reason']=(job.get('match_reason','')+' | LOCATION UNVERIFIED: '+(loc['evidence'] or 'none')).strip(' |')
+                        job['company']=company['name'];job['city']='Munich';job.pop('matched_city',None);confirmed.append(job)
                         continue
                     job['company']=company['name'];job['city']='Munich';job.pop('matched_city',None);confirmed.append(job)
                 row['title_rejected_samples']=[j['title'] for j in row['title_rejection_details'][:8]]
