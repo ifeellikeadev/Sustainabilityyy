@@ -119,7 +119,7 @@ title_must_not_match:
 - ökobilanz
 - lebenszyklusanalyse
 - openlca
-main_min_score: 3
+main_min_score: 2
 score_ceiling: 20
 scoring_keywords:
 - term: GHG
