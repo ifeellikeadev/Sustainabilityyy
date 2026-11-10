@@ -1,28 +1,28 @@
 {
-  "generated_at": "2026-11-10T06:14:19.511745+00:00",
-  "run_id": "42761299742",
+  "generated_at": "2026-11-10T20:02:46.224404+00:00",
+  "run_id": "42881716444",
   "run_attempt": "1",
-  "source_commit": "c65e330add316616562757e97473c8f9044eeb28",
+  "source_commit": "2265aa4d8f9e6e19e030736a55806beeab6a0b4d",
   "counts": {
-    "ok": 184,
-    "empty": 117,
+    "ok": 181,
+    "empty": 120,
     "errored": 0,
     "total": 301,
-    "title_matched": 42,
-    "location_confirmed": 37,
+    "title_matched": 41,
+    "location_confirmed": 36,
     "source_statuses": {
-      "PARTIAL_OR_WARNING": 101,
-      "FAILED_OR_BLOCKED": 117,
-      "NO_MATCHES_IN_EXTRACTED_RESULTS": 80,
+      "PARTIAL_OR_WARNING": 99,
+      "FAILED_OR_BLOCKED": 120,
+      "NO_MATCHES_IN_EXTRACTED_RESULTS": 79,
       "EXTRACTION_INCOMPLETE": 1,
       "MATCHES_FOUND": 2
     }
   },
   "tracker": {
-    "added": 1,
-    "already_tracked": 30,
-    "pruned": 2,
-    "total_rows": 46,
+    "added": 2,
+    "already_tracked": 28,
+    "pruned": 0,
+    "total_rows": 48,
     "related_score_pruned": 0
   },
   "coverage_degraded": true
