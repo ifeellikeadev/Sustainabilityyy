@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-11-17T20:57:27.328892+00:00",
-  "run_id": "44167373553",
+  "generated_at": "2026-11-18T05:49:04.133917+00:00",
+  "run_id": "44242581663",
   "run_attempt": "1",
-  "source_commit": "e6b1d702bc9f16b6e420212bb2e65208626e5320",
+  "source_commit": "b5643e67aea439571e00a119ea4f8714bf776524",
   "counts": {
     "ok": 164,
     "empty": 137,
@@ -19,10 +19,10 @@
     }
   },
   "tracker": {
-    "added": 1,
-    "already_tracked": 7,
-    "pruned": 0,
-    "total_rows": 44,
+    "added": 0,
+    "already_tracked": 8,
+    "pruned": 1,
+    "total_rows": 43,
     "related_score_pruned": 0
   },
   "coverage_degraded": true
